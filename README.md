@@ -30,8 +30,8 @@ The software architecture is decoupled into four primary operational modules exe
     |      (rag_engine.py)      |      |     (voice_engine.py)      |
     +-------------+-------------+      +------+---------------------+
                   |                           ^
-   Ingested Raw   | Chunks                    | Clean 4s Clip
-   Corpus Data    v                           |
+    Ingested Raw   | Chunks                    | Clean 4s Clip
+    Corpus Data    v                           |
     +-------------+-------------+      +------+---------------------+
     |    Corpus Index Storage   |      |   Audio Mastering Engine   |
     |   (Historical/Scientific) |      |     (master_audio.py)      |
@@ -114,18 +114,18 @@ Throughout development, the codebase went through several iterations to resolve 
 
 ## 5. Performance Profiles & Optimization Constraints
 
-+----------------------------------------------------------------------------------+
-|                             SYSTEM TIME BUDGET MATRIX                            |
-+----------------------------------------------------------------------------------+
-| PHASE 1: Semantic Local Retrieval Matrix (RAG)                                   |
-| [X] Microseconds                                                                 |
-+----------------------------------------------------------------------------------+
-| PHASE 2: Cloud API Streaming (Time-to-First-Token)                               |
-| [XXXX] <200ms                                                                    |
-+----------------------------------------------------------------------------------+
-| PHASE 3: Voice Generation Pass (32-Step Flow-Matching inference)                 |
-| [XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX] Dependent on sentence length     |
-+----------------------------------------------------------------------------------+
+    +----------------------------------------------------------------------------------+
+    |                             SYSTEM TIME BUDGET MATRIX                            |
+    +----------------------------------------------------------------------------------+
+    | PHASE 1: Semantic Local Retrieval Matrix (RAG)                                   |
+    | [X] Microseconds                                                                 |
+    +----------------------------------------------------------------------------------+
+    | PHASE 2: Cloud API Streaming (Time-to-First-Token)                               |
+    | [XXXX] <200ms                                                                    |
+    +----------------------------------------------------------------------------------+
+    | PHASE 3: Voice Generation Pass (32-Step Flow-Matching inference)                 |
+    | [XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX] Dependent on sentence length     |
+    +----------------------------------------------------------------------------------+
 
 
 * **RAG Local Index Match Lookup:** Microseconds ($O(\log N)$ scale graph traversal).
