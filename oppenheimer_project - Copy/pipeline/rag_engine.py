@@ -20,11 +20,12 @@ os.makedirs(INDEX_DIR, exist_ok=True)
 PARENT_CHUNKS_PATH = os.path.join(INDEX_DIR, "parent_chunks.json")
 CHILD_CHUNKS_PATH = os.path.join(INDEX_DIR, "child_chunks.json")
 EMBEDDINGS_PATH = os.path.join(INDEX_DIR, "child_embeddings.npy")
+TOKEN_EMBEDDINGS_PATH = os.path.join(INDEX_DIR, "child_token_embeddings.pkl")
 BM25_PATH = os.path.join(INDEX_DIR, "bm25_model.pkl")
 
 class AdvancedOppenheimerRAG:
     def __init__(self):
-        print("⚡ Initializing Tier-1 Hybrid Retrieval Environment...")
+        print("⚡ Initializing Tier-1 Accelerated Hybrid Retrieval Environment...")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"🖥️ Execution Target Device: {self.device.upper()}")
         
@@ -35,6 +36,11 @@ class AdvancedOppenheimerRAG:
         self.child_chunks: List[Dict[str, Any]] = []
         self.bm25: BM25Okapi = None
         self.child_embeddings: np.ndarray = None
+        self.child_token_embeddings: List[torch.Tensor] = []
+
+    def _clean_tokenize(self, text: str) -> List[str]:
+        """Strips punctuation artifacts and extracts precise lowercase alpha-numeric tokens."""
+        return re.findall(r'\b\w+\b', text.lower())
 
     def build_hierarchical_corpus(self):
         """Parses raw text, maps parent-child chunk frameworks, and extracts metadata tags."""
@@ -99,7 +105,17 @@ class AdvancedOppenheimerRAG:
             child_texts, show_progress_bar=True, convert_to_numpy=True, normalize_embeddings=True
         )
         
-        tokenized_corpus = [doc.lower().split(" ") for doc in child_texts]
+        print("🪙 Compiling token-level multi-vector spaces into cache structures...")
+        with torch.no_grad():
+            raw_tokens = self.embed_model.encode(
+                child_texts, show_progress_bar=True, output_value="token_embeddings", convert_to_tensor=True
+            )
+            if isinstance(raw_tokens, torch.Tensor):
+                self.child_token_embeddings = [t.cpu() for t in raw_tokens]
+            else:
+                self.child_token_embeddings = [t.cpu() for t in raw_tokens]
+        
+        tokenized_corpus = [self._clean_tokenize(doc) for doc in child_texts]
         self.bm25 = BM25Okapi(tokenized_corpus)
         
         self.save_indices_to_disk()
@@ -116,15 +132,18 @@ class AdvancedOppenheimerRAG:
             
         np.save(EMBEDDINGS_PATH, self.child_embeddings)
         
+        with open(TOKEN_EMBEDDINGS_PATH, "wb") as f:
+            pickle.dump(self.child_token_embeddings, f, protocol=pickle.HIGHEST_PROTOCOL)
+        
         with open(BM25_PATH, "wb") as f:
             pickle.dump(self.bm25, f)
             
-        print(f"🚀 Success! Persistence complete. Check your empty directory: {INDEX_DIR}")
+        print(f"🚀 Success! Persistence complete. Vector store ready: {INDEX_DIR}")
 
     def load_indices_from_disk(self) -> bool:
         """Loads pre-compiled vector matrices from your storage sector in under 5 milliseconds."""
         if not (os.path.exists(PARENT_CHUNKS_PATH) and os.path.exists(CHILD_CHUNKS_PATH) and 
-                os.path.exists(EMBEDDINGS_PATH) and os.path.exists(BM25_PATH)):
+                os.path.exists(EMBEDDINGS_PATH) and os.path.exists(TOKEN_EMBEDDINGS_PATH) and os.path.exists(BM25_PATH)):
             return False
             
         print("📦 Pre-compiled storage indices found! Streaming structures straight to RAM...")
@@ -136,6 +155,9 @@ class AdvancedOppenheimerRAG:
             
         self.child_embeddings = np.load(EMBEDDINGS_PATH)
         
+        with open(TOKEN_EMBEDDINGS_PATH, "rb") as f:
+            self.child_token_embeddings = pickle.load(f)
+        
         with open(BM25_PATH, "rb") as f:
             self.bm25 = pickle.load(f)
             
@@ -143,12 +165,18 @@ class AdvancedOppenheimerRAG:
         return True
 
     def pipeline_retrieve(self, query: str, metadata_filter: Dict[str, Any] = None, top_k: int = 3) -> List[Dict[str, Any]]:
-        query_tokens = query.lower().split(" ")
+        query_tokens = self._clean_tokenize(query)
+        
         query_embedding = self.embed_model.encode(query, convert_to_numpy=True, normalize_embeddings=True)
         
         with torch.no_grad():
-            query_token_embeddings = self.embed_model.encode(query, output_value="token_embeddings", convert_to_tensor=True)
+            query_token_embeddings = self.embed_model.encode(query, output_value="token_embeddings", convert_to_tensor=True).to(self.device)
         
+        dense_scores = np.dot(self.child_embeddings, query_embedding)
+        
+        bm25_raw_scores = np.array(self.bm25.get_scores(query_tokens))
+        normalized_bm25_scores = bm25_raw_scores / (bm25_raw_scores + 10.0)
+
         scored_candidates = []
 
         for idx, child in enumerate(self.child_chunks):
@@ -157,15 +185,13 @@ class AdvancedOppenheimerRAG:
                 if not match:
                     continue
             
-            dense_score = float(np.dot(query_embedding, self.child_embeddings[idx]))
-            bm25_score = float(self.bm25.get_scores(query_tokens)[idx])
-            normalized_bm25 = bm25_score / (bm25_score + 10.0) if bm25_score > 0 else 0.0
+            dense_score = float(dense_scores[idx])
+            normalized_bm25 = float(normalized_bm25_scores[idx])
 
-            # Mathematical ColBERT Token Late-Interaction (MaxSim) Matrix Evaluation
             with torch.no_grad():
-                child_token_embeddings = self.embed_model.encode(child["text"], output_value="token_embeddings", convert_to_tensor=True)
-                similarity_matrix = torch.matmul(query_token_embeddings, child_token_embeddings.T)
-                colbert_score = float(torch.sum(torch.max(similarity_matrix, dim=1).values).cpu().item())
+                child_tokens = self.child_token_embeddings[idx].to(self.device)
+                similarity_matrix = torch.matmul(query_token_embeddings, child_tokens.T)
+                colbert_score = float(torch.sum(torch.max(similarity_matrix, dim=1).values).item())
                 normalized_colbert = torch.sigmoid(torch.tensor(colbert_score)).item()
 
             hybrid_score = (0.35 * dense_score) + (0.25 * normalized_bm25) + (0.40 * normalized_colbert)
