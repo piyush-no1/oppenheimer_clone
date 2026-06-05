@@ -97,14 +97,13 @@ GEMINI_KEY = RAW_KEY.strip().strip("'").strip('"')
 # --- SECTOR 2: INTERFACE STYLING ---
 st.set_page_config(page_title="Oppenheimer Matrix", page_icon="⚛️", layout="centered")
 
-# Overhauled precision CSS sheet injection to redesign the trash element to meet modern UI specifications
 st.markdown("""
     <style>
     .stApp { background-color: #0E1117; color: #E0E0E0; }
     h1, h2, h3 { font-family: 'Georgia', serif; color: #F3F4F6; }
     div[data-testid="stHorizontalBlock"] { align-items: center; }
     
-    /* Institutional-Grade Minimalist Delete Button Blueprint */
+    /* Premium Minimalist Delete Button Framework Overrides */
     div[data-testid="stSidebar"] button[key*="delete_session"] {
         background-color: transparent !important;
         border: none !important;
@@ -127,7 +126,7 @@ st.markdown("""
         transform: scale(0.92) !important;
     }
     
-    /* Center aligning column structures in sidebar loops to avoid baseline mismatch steps */
+    /* Align container rows perfectly within sidebar tracking loops */
     div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] {
         gap: 4px !important;
     }
@@ -218,7 +217,6 @@ with st.sidebar:
     for sess_key in list(st.session_state.all_sessions["sessions"].keys()):
         is_current = (sess_key == st.session_state.all_sessions["active_session"])
         
-        # Partitioned sidebar row tracking layout allocation
         sess_button_col, delete_action_col = st.columns([4.2, 0.8])
         
         with sess_button_col:
@@ -356,13 +354,12 @@ if user_input:
         
         user_message_content = f"Context Excerpts:\n{fused_context}\n\nUser Question: {user_input}"
         
-        text_container = st.empty()
-        raw_ai_text = ""
+        raw_ai_text = None
         max_retries = 3
         
         for attempt in range(max_retries):
             try:
-                response_stream = st.session_state.gemini_client.models.generate_content_stream(
+                response = st.session_state.gemini_client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=user_message_content,
                     config=genai_types.GenerateContentConfig(
@@ -372,23 +369,14 @@ if user_input:
                         max_output_tokens=1024 
                     )
                 )
-                
-                for chunk in response_stream:
-                    if chunk.text:
-                        raw_ai_text += chunk.text
-                        text_container.markdown(f"""
-                            <div style="display: flex; justify-content: flex-start; margin-bottom: 14px;">
-                                <div style="background-color: #121620; border-left: 4px solid #FFB800; padding: 14px 18px; border-radius: 16px 16px 16px 2px; max-width: 85%; color: #F3F4F6; font-family: 'Georgia', serif; line-height: 1.6; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <span style="color: #FFB800; font-weight: bold; font-family: monospace; display: block; margin-bottom: 6px;">[OPPENHEIMER]:</span>
-                                    <span style="font-size: 16px;">{raw_ai_text}▌</span>
-                                </div>
-                            </div>
-                        """, unsafe_allow_html=True)
-                break  
+                if response and response.text:
+                    raw_ai_text = response.text
+                    break  
+                else:
+                    raise ValueError("Blocked or empty content response payload.")
             except Exception as e:
                 if attempt < max_retries - 1:
                     time.sleep(1.5 * (attempt + 1))
-                    raw_ai_text = ""
                     continue
                 print(f"❌ Gemini Connection/Safety Exception: {e}")
 
@@ -407,9 +395,9 @@ if user_input:
 
     loader_placeholder.empty()
     
-    text_container.markdown(f"""
+    st.markdown(f"""
         <div style="display: flex; justify-content: flex-start; margin-bottom: 14px;">
-            <div style="background-color: #121620; border-left: 4px solid #FFB800; padding: 14px 18px; border-radius: 16px 16px 16px 2px; max-width: 85%; color: #F3F4F6; font-family: 'Georgia', serif; line-height: 1.6; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="background-color: #121620; border: 1px solid #232A36; padding: 14px 18px; border-radius: 16px 16px 16px 2px; max-width: 85%; color: #F3F4F6; font-family: 'Georgia', serif; line-height: 1.6; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <span style="color: #FFB800; font-weight: bold; font-family: monospace; display: block; margin-bottom: 6px;">[OPPENHEIMER]:</span>
                 <span style="font-size: 16px;">{ai_text}</span>
             </div>
@@ -431,15 +419,22 @@ if user_input:
                     if audio_file_path and os.path.exists(audio_file_path):
                         with open(audio_file_path, "rb") as audio_file:
                             audio_bytes = audio_file.read()
-                        base64_audio = base64.b64encode(audio_bytes).decode()
-                        
-                        hidden_audio_html = f"""
-                            <audio autoplay="true" style="display:none;">
-                                <source src="data:audio/wav;base64,{base64_audio}" type="audio/wav">
-                            </audio>
-                        """
-                        st.markdown(hidden_audio_html, unsafe_allow_html=True)
+                        # 🛡️ FIXED CORE LOGIC: Commit vector to session state to prevent st.rerun() destruction
+                        st.session_state.pending_audio = base64.b64encode(audio_bytes).decode()
                     else:
                         st.error("❌ Audio engine finished computation but failed to write wav asset file.")
                 except Exception as audio_err:
                     st.error(f"❌ Core TTS Inference Engine Error: {audio_err}")
+
+    # 🚀 FIXED: Triggers full UI refresh block to force newly created log histories cleanly above your input bar elements
+    st.rerun()
+
+# --- ATOMIC DISPATCH ENDPOINT (Triggers sound output exactly as layout settles) ---
+if "pending_audio" in st.session_state and st.session_state.pending_audio:
+    hidden_audio_html = f"""
+        <audio autoplay="true" style="display:none;">
+            <source src="data:audio/wav;base64,{st.session_state.pending_audio}" type="audio/wav">
+        </audio>
+    """
+    st.markdown(hidden_audio_html, unsafe_allow_html=True)
+    st.session_state.pending_audio = None
