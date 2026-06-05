@@ -5,9 +5,8 @@ import importlib.metadata
 import typing
 import time
 import re
-import base64  # Converted audio vectors to hidden browser stream fragments
+import base64  
 
-# --- PHASE 1: UNIVERSAL TYPE-AWARE MOCK GENERATOR LAYER ---
 class FlawlessStrMock(str):
     def __new__(cls, value, *args, **kwargs):
         return super().__new__(cls, value)
@@ -64,7 +63,6 @@ mock_torchcodec = FlawlessStrMock("torchcodec", is_package=True)
 sys.modules["torchcodec"] = mock_torchcodec
 sys.modules["torchcodec.decoders"] = mock_torchcodec.decoders
 
-# --- PHASE 2: APPLICATION RUNTIME IMPORTERS ---
 import os
 import json
 import streamlit as st
@@ -72,14 +70,11 @@ from google import genai
 from google.genai import types as genai_types
 from dotenv import load_dotenv
 
-# --- PHASE 3: CRITICAL CACHE FLUSHING CONTROLLER ---
 if "torchcodec" in sys.modules: del sys.modules["torchcodec"]
 if "torchcodec.decoders" in sys.modules: del sys.modules["torchcodec.decoders"]
 
-# Import engine and diagnostics seamlessly from local pipeline module
 from pipeline.voice_engine import voice_cloner, INIT_ERROR
 
-# --- SECTOR 1: ROUTING & KEY ACQUISITION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 HISTORY_FILE_PATH = os.path.join(BASE_DIR, "chat_history.json")
 
@@ -94,7 +89,6 @@ if not RAW_KEY:
 
 GEMINI_KEY = RAW_KEY.strip().strip("'").strip('"')
 
-# --- SECTOR 2: INTERFACE STYLING ---
 st.set_page_config(page_title="Oppenheimer Matrix", page_icon="⚛️", layout="centered")
 
 st.markdown("""
@@ -147,7 +141,6 @@ def trim_to_complete_sentences(text: str) -> str:
         return text[:last_valid_index].strip()
     return text
 
-# --- SECTOR 3: MULTI-SESSION PERSISTENCE LAYERS ---
 def load_persistent_chat_history() -> dict:
     default_history = [{"role": "assistant", "text": "We knew the world would not be the same. A few people laughed, a few people cried, most people were silent. What is it you wish to deliberate upon?"}]
     default_structure = {"active_session": "Session 1", "sessions": {"Session 1": default_history}}
@@ -169,7 +162,6 @@ def save_persistent_chat_history(ignored_arg=None):
             json.dump(st.session_state.all_sessions, f, ensure_ascii=False, indent=2)
     except Exception as e: print(f"Failed to serialize session state: {e}")
 
-# --- SECTOR 4: ENGINE CORE CONTEXT CACHING ---
 if "rag_engine" not in st.session_state:
     with st.spinner("Streaming pre-compiled math indices to local RAM..."):
         from pipeline.rag_engine import AdvancedOppenheimerRAG
@@ -192,7 +184,6 @@ if "active_query" not in st.session_state:
 if "widget_counter" not in st.session_state:
     st.session_state.widget_counter = 0
 
-# --- SECTOR 5: SIDEBAR CONTROLS & MULTI-SESSION TREE VIEW ---
 with st.sidebar:
     st.title("⚛️ Digital Clone")
     st.markdown("---")
@@ -256,7 +247,6 @@ with st.sidebar:
         st.error("❌ Voice Engine: OFFLINE")
         st.caption(f"Diagnostic Report: `{INIT_ERROR}`")
 
-# --- SECTOR 6: INTERFACE APPLICATION HUB (PARTITIONED UI BALANCING) ---
 st.title("The Virtual Oppenheimer")
 st.markdown("---")
 
@@ -280,7 +270,6 @@ for msg in st.session_state.chat_history:
             </div>
         """, unsafe_allow_html=True)
 
-# --- SECTOR 7: ADJACENT INTERACTIVE SEARCH BAR WITH VOICE BUTTON ---
 input_container = st.container()
 
 with input_container:
@@ -407,7 +396,6 @@ if user_input:
     st.session_state.chat_history.append({"role": "assistant", "text": ai_text})
     save_persistent_chat_history()
     
-    # --- SYNCHRONOUS HIDDEN AUDIO PLAYBACK ENGINE ---
     if st.session_state.get("audio_playback_toggle", True):
         if voice_cloner is None:
             st.error(f"⚠️ Voice Matrix Generation Aborted: Voice Engine is Offline ({INIT_ERROR})")
@@ -419,17 +407,14 @@ if user_input:
                     if audio_file_path and os.path.exists(audio_file_path):
                         with open(audio_file_path, "rb") as audio_file:
                             audio_bytes = audio_file.read()
-                        # 🛡️ FIXED CORE LOGIC: Commit vector to session state to prevent st.rerun() destruction
                         st.session_state.pending_audio = base64.b64encode(audio_bytes).decode()
                     else:
                         st.error("❌ Audio engine finished computation but failed to write wav asset file.")
                 except Exception as audio_err:
                     st.error(f"❌ Core TTS Inference Engine Error: {audio_err}")
 
-    # 🚀 FIXED: Triggers full UI refresh block to force newly created log histories cleanly above your input bar elements
     st.rerun()
 
-# --- ATOMIC DISPATCH ENDPOINT (Triggers sound output exactly as layout settles) ---
 if "pending_audio" in st.session_state and st.session_state.pending_audio:
     hidden_audio_html = f"""
         <audio autoplay="true" style="display:none;">
