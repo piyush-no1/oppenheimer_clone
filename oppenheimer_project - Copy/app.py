@@ -142,7 +142,7 @@ def trim_to_complete_sentences(text: str) -> str:
     return text
 
 def load_persistent_chat_history() -> dict:
-    default_history = [{"role": "assistant", "text": "We knew the world would not be the same. A few people laughed, a few people cried, most people were silent. What is it you wish to deliberate upon?"}]
+    default_history = [{"role": "assistant", "text": "When you see something that is technically sweet, you go ahead and do it..."}]
     default_structure = {"active_session": "Session 1", "sessions": {"Session 1": default_history}}
     
     if os.path.exists(HISTORY_FILE_PATH) and os.path.getsize(HISTORY_FILE_PATH) > 0:
@@ -194,7 +194,7 @@ with st.sidebar:
         next_session_index = max(parsed_digits) + 1 if parsed_digits else 1
         
         new_id = f"Session {next_session_index}"
-        default_history = [{"role": "assistant", "text": "We knew the world would not be the same. A few people laughed, a few people cried, most people were silent. What is it you wish to deliberate upon?"}]
+        default_history = [{"role": "assistant", "text": "When you see something that is technically sweet, you go ahead and do it..."}]
         
         st.session_state.all_sessions["sessions"][new_id] = default_history
         st.session_state.all_sessions["active_session"] = new_id
@@ -230,7 +230,7 @@ with st.sidebar:
                     if remaining_keys:
                         st.session_state.all_sessions["active_session"] = remaining_keys[0]
                     else:
-                        fallback_history = [{"role": "assistant", "text": "We knew the world would not be the same. A few people laughed, a few people cried, most people were silent. What is it you wish to deliberate upon?"}]
+                        fallback_history = [{"role": "assistant", "text": "When you see something that is technically sweet, you go ahead and do it..."}]
                         st.session_state.all_sessions["sessions"]["Session 1"] = fallback_history
                         st.session_state.all_sessions["active_session"] = "Session 1"
                         
