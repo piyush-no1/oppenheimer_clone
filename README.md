@@ -54,5 +54,5 @@ OPPENHEIMER_PROJECT/
 │
 ├── .env                           # Protected registry configuration file: Houses API keys
 ├── app.py                         # Application Master Core: Lifecycle manager and layout interface
-├── chat_history.json              # Persistent workspace storage: Conversation log database
-└── requirements.txt               # Master package directory registry list
+└── chat_history.json              # Persistent workspace storage: Conversation log database
+
